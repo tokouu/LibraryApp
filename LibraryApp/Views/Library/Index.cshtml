@@ -1,0 +1,394 @@
+@{
+    ViewData["Title"] = "Library Management";
+    Layout = "_LibraryLayout";
+}
+
+<!-- Rest of your existing content stays the same -->
+
+<!-- Include AngularJS and Bootstrap -->
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+    .media-card {
+        transition: transform 0.2s;
+    }
+
+    .media-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .media-type-badge {
+        font-size: 0.8em;
+    }
+
+    .search-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .add-media-section {
+        background-color: #e7f3ff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+</style>
+
+<div class="container-fluid" ng-app="libraryApp" ng-controller="LibraryController as ctrl">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">📚 Library Management System</h1>
+
+            <!-- Loading Indicator -->
+            <div ng-if="ctrl.loading" class="alert alert-info">
+                <i class="spinner-border spinner-border-sm me-2"></i>
+                Loading...
+            </div>
+
+            <!-- Error Messages -->
+            <div ng-if="ctrl.error" class="alert alert-danger alert-dismissible">
+                <strong>Error:</strong> {{ctrl.error}}
+                <button type="button" class="btn-close" ng-click="ctrl.clearError()"></button>
+            </div>
+
+            <!-- Success Messages -->
+            <div ng-if="ctrl.success" class="alert alert-success alert-dismissible">
+                <strong>Success:</strong> {{ctrl.success}}
+                <button type="button" class="btn-close" ng-click="ctrl.clearSuccess()"></button>
+            </div>
+
+            <!-- Search Section -->
+            <div class="search-section">
+                <h3>🔍 Search & Filter</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" ng-model="ctrl.searchQuery"
+                            placeholder="Search by title, author, or genre..."
+                            ng-keyup="$event.keyCode == 13 && ctrl.searchMedia()">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control" ng-model="ctrl.filterType">
+                            <option value="">All Types</option>
+                            <option value="0">Books</option>
+                            <option value="1">CDs</option>
+                            <option value="2">DVDs</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary me-2" ng-click="ctrl.searchMedia()">Search</button>
+                        <button class="btn btn-secondary" ng-click="ctrl.loadAllMedia()">Clear</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add New Media Section -->
+            <div class="add-media-section">
+                <h3>➕ Add New Media</h3>
+                <form ng-submit="ctrl.addMedia()" name="mediaForm">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label>Media Type *</label>
+                            <select class="form-control" ng-model="ctrl.newMedia.mediaType" required>
+                                <option value="">Select Type</option>
+                                <option value="0">Book</option>
+                                <option value="1">CD</option>
+                                <option value="2">DVD</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Title *</label>
+                            <input type="text" class="form-control" ng-model="ctrl.newMedia.title" placeholder="Title"
+                                required>
+                        </div>
+                        <div class="col-md-3">
+                            <label>Author/Artist *</label>
+                            <input type="text" class="form-control" ng-model="ctrl.newMedia.author"
+                                placeholder="Author/Artist" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label>Genre *</label>
+                            <input type="text" class="form-control" ng-model="ctrl.newMedia.genre" placeholder="Genre"
+                                required>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <label>Release Date *</label>
+                            <input type="date" class="form-control" ng-model="ctrl.newMedia.releaseDate" required>
+                        </div>
+
+                        <!-- Book specific fields -->
+                        <div class="col-md-3" ng-if="ctrl.newMedia.mediaType == '0'">
+                            <label>Pages</label>
+                            <input type="number" class="form-control" ng-model="ctrl.newMedia.pages" placeholder="Pages"
+                                min="1">
+                        </div>
+                        <div class="col-md-3" ng-if="ctrl.newMedia.mediaType == '0'">
+                            <label>ISBN</label>
+                            <input type="text" class="form-control" ng-model="ctrl.newMedia.isbn" placeholder="ISBN">
+                        </div>
+
+                        <!-- CD specific fields -->
+                        <div class="col-md-3" ng-if="ctrl.newMedia.mediaType == '1'">
+                            <label>Duration (minutes)</label>
+                            <input type="number" class="form-control" ng-model="ctrl.newMedia.durationMinutes"
+                                placeholder="Duration" min="1">
+                        </div>
+
+                        <!-- DVD specific fields -->
+                        <div class="col-md-3" ng-if="ctrl.newMedia.mediaType == '2'">
+                            <label>Duration (minutes)</label>
+                            <input type="number" class="form-control" ng-model="ctrl.newMedia.durationMinutes"
+                                placeholder="Duration" min="1">
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-success"
+                                ng-disabled="mediaForm.$invalid || ctrl.loading">
+                                <span ng-if="ctrl.loading" class="spinner-border spinner-border-sm me-2"></span>
+                                Add Media
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2"
+                                ng-click="ctrl.resetForm()">Reset</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Media Collection Display -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3>📖 Media Collection</h3>
+                        <span class="badge bg-primary fs-6">{{ctrl.displayedItems.length}} items</span>
+                    </div>
+
+                    <!-- No items message -->
+                    <div ng-if="ctrl.displayedItems.length === 0 && !ctrl.loading" class="text-center py-5">
+                        <h5 class="text-muted">No media items found</h5>
+                        <p class="text-muted">Try adding some media or adjusting your search criteria.</p>
+                    </div>
+
+                    <!-- Media Cards -->
+                    <div class="row">
+                        <div class="col-lg-4 col-md-6 mb-4" ng-repeat="media in ctrl.displayedItems">
+                            <div class="card media-card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">{{media.title}}</h6>
+                                    <span class="badge media-type-badge"
+                                        ng-class="{'bg-success': media.mediaType === 0, 'bg-info': media.mediaType === 1, 'bg-warning': media.mediaType === 2}">
+                                        {{ctrl.getMediaTypeName(media.mediaType)}}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-2"><strong>Author/Artist:</strong> {{media.author}}</p>
+                                    <p class="mb-2"><strong>Genre:</strong> {{media.genre}}</p>
+                                    <p class="mb-2"><strong>Release Date:</strong> {{media.releaseDate |
+                                        date:'mediumDate'}}</p>
+
+                                    <!-- Book specific display -->
+                                    <div ng-if="media.mediaType === 0 && media.pages">
+                                        <p class="mb-1"><small><strong>Pages:</strong> {{media.pages}}</small></p>
+                                    </div>
+                                    <div ng-if="media.mediaType === 0 && media.isbn">
+                                        <p class="mb-1"><small><strong>ISBN:</strong> {{media.isbn}}</small></p>
+                                    </div>
+
+
+                                    <p class="mb-2"><small class="text-muted">ID: {{media.id}}</small></p>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-danger btn-sm"
+                                        ng-click="ctrl.deleteMedia(media.id, media.title)" ng-disabled="ctrl.loading">
+                                        <i class="text-white">🗑️</i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AngularJS Application -->
+<script>
+    // Create AngularJS module
+    angular.module('libraryApp', []);
+
+    // Create controller
+    angular.module('libraryApp').controller('LibraryController', function ($http) {
+        var vm = this;
+
+        // State management
+        vm.mediaItems = [];
+        vm.displayedItems = [];
+        vm.loading = false;
+        vm.error = null;
+        vm.success = null;
+        vm.searchQuery = '';
+        vm.filterType = '';
+
+        // Form data
+        vm.newMedia = {};
+
+        // Utility functions
+        vm.getMediaTypeName = function (type) {
+            switch (parseInt(type)) {
+                case 0: return 'Book';
+                case 1: return 'CD';
+                case 2: return 'DVD';
+                default: return 'Unknown';
+            }
+        };
+
+        vm.clearError = function () {
+            vm.error = null;
+        };
+
+        vm.clearSuccess = function () {
+            vm.success = null;
+        };
+
+        // API calls
+        vm.loadAllMedia = function () {
+            vm.loading = true;
+            vm.error = null;
+            vm.searchQuery = '';
+            vm.filterType = '';
+
+            $http.get('/media')
+                .then(function (response) {
+                    vm.mediaItems = response.data;
+                    vm.displayedItems = response.data;
+                    console.log('Loaded media:', vm.mediaItems.length, 'items');
+                })
+                .catch(function (error) {
+                    vm.error = 'Failed to load media: ' + (error.data?.message || error.statusText);
+                    console.error('Error loading media:', error);
+                })
+                .finally(function () {
+                    vm.loading = false;
+                });
+        };
+
+        vm.searchMedia = function () {
+            if (!vm.searchQuery && !vm.filterType) {
+                vm.loadAllMedia();
+                return;
+            }
+
+            vm.loading = true;
+            vm.error = null;
+
+            // Build URL manually
+            var url = '/media?';
+            var params = [];
+
+            if (vm.searchQuery) {
+                params.push('query=' + encodeURIComponent(vm.searchQuery));
+            }
+            if (vm.filterType) {
+                params.push('mediaType=' + encodeURIComponent(vm.filterType));
+            }
+
+            url += params.join('&');
+
+            console.log('Search URL:', url); // DEBUG
+
+            $http.get(url)
+                .then(function (response) {
+                    console.log('Search response:', response.data.length, 'items');
+                    vm.displayedItems = response.data;
+                    vm.success = 'Found ' + response.data.length + ' items';
+                })
+                .catch(function (error) {
+                    console.log('Search error:', error);
+                    vm.error = 'Search failed: ' + (error.data?.message || error.statusText);
+                })
+                .finally(function () {
+                    vm.loading = false;
+                });
+        };
+
+        vm.addMedia = function () {
+            vm.loading = true;
+            vm.error = null;
+
+            // Prepare the data based on media type
+            var mediaData = {
+                title: vm.newMedia.title,
+                author: vm.newMedia.author,
+                genre: vm.newMedia.genre,
+                releaseDate: vm.newMedia.releaseDate,
+                mediaType: parseInt(vm.newMedia.mediaType)
+            };
+
+            // Add type-specific properties
+            if (mediaData.mediaType === 0) { // Book
+                if (vm.newMedia.pages) mediaData.pages = parseInt(vm.newMedia.pages);
+                if (vm.newMedia.isbn) mediaData.isbn = vm.newMedia.isbn;
+            } else if (mediaData.mediaType === 1) { // CD
+                if (vm.newMedia.durationMinutes) mediaData.duration = vm.newMedia.durationMinutes + ':00';
+            } else if (mediaData.mediaType === 2) { // DVD
+                if (vm.newMedia.durationMinutes) mediaData.duration = vm.newMedia.durationMinutes + ':00';
+            }
+
+            $http.post('/media', mediaData)
+                .then(function (response) {
+                    vm.success = 'Successfully added "' + response.data.title + '"';
+                    vm.resetForm();
+                    vm.loadAllMedia(); // Refresh the list
+                })
+                .catch(function (error) {
+                    vm.error = 'Failed to add media: ' + (error.data?.message || error.statusText);
+                    console.error('Error adding media:', error);
+                })
+                .finally(function () {
+                    vm.loading = false;
+                });
+        };
+
+        vm.deleteMedia = function (id, title) {
+            if (!confirm('Are you sure you want to delete "' + title + '"?')) {
+                return;
+            }
+
+            vm.loading = true;
+            vm.error = null;
+
+            $http.delete('/media/' + id)
+                .then(function (response) {
+                    vm.success = 'Successfully deleted "' + title + '"';
+                    vm.loadAllMedia(); // Refresh the list
+                })
+                .catch(function (error) {
+                    vm.error = 'Failed to delete media: ' + (error.data?.message || error.statusText);
+                    console.error('Error deleting media:', error);
+                })
+                .finally(function () {
+                    vm.loading = false;
+                });
+        };
+
+        vm.resetForm = function () {
+            vm.newMedia = {};
+        };
+
+        // Initialize
+        vm.loadAllMedia();
+    });
+</script>
